@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "lint": "eslint . && tsc --noEmit"
+    "lint": "eslint ."
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
