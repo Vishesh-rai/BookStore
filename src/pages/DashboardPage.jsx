@@ -27,19 +27,26 @@ import { Book as BookIcon, FileUp, ImagePlus, Heart, Download } from 'lucide-rea
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { publishBook, subscribeToAuthorBooks } from '@/lib/books';
+import { uploadFile } from '@/lib/storage';
+import { useRef } from 'react';
 
 export function DashboardPage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('upload');
   const [authorBooks, setAuthorBooks] = useState([]);
   
+  const coverInputRef = useRef(null);
+  const pdfInputRef = useRef(null);
+
   // Form State
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('Education');
-  const [coverImage, setCoverImage] = useState('');
-  const [pdfUrl, setPdfUrl] = useState('');
+  const [coverFile, setCoverFile] = useState(null);
+  const [pdfFile, setPdfFile] = useState(null);
+  
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({ cover: 0, pdf: 0 });
 
   useEffect(() => {
     if (!user) return;
@@ -64,10 +71,33 @@ export function DashboardPage() {
  
   const handleUpload = async (e) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user) {
+      toast.error('You must be logged in to publish a book.');
+      return;
+    }
+
+    if (!coverFile || !pdfFile) {
+      toast.error('Please select both a cover image and a PDF document.');
+      return;
+    }
     
     setIsUploading(true);
+    setUploadProgress({ cover: 0, pdf: 0 });
+
     try {
+      // 1. Upload Cover
+      const coverPath = `books/${user.id}/${Date.now()}_cover_${coverFile.name}`;
+      const coverUrl = await uploadFile(coverFile, coverPath, (p) => 
+        setUploadProgress(prev => ({ ...prev, cover: p }))
+      );
+
+      // 2. Upload PDF
+      const pdfPath = `books/${user.id}/${Date.now()}_doc_${pdfFile.name}`;
+      const pdfUrlFinal = await uploadFile(pdfFile, pdfPath, (p) => 
+        setUploadProgress(prev => ({ ...prev, pdf: p }))
+      );
+
+      // 3. Save Metadata
       await publishBook({
         title,
         description,
@@ -75,17 +105,19 @@ export function DashboardPage() {
         authorId: user.id,
         authorName: user.name,
         authorNiche: user.niche || 'Education',
-        coverImage: coverImage || `https://picsum.photos/seed/${title}/400/600`,
-        pdfUrl: pdfUrl || '#',
+        coverImage: coverUrl,
+        pdfUrl: pdfUrlFinal,
       });
       
       toast.success('Book published successfully!');
       setTitle('');
       setDescription('');
-      setCoverImage('');
-      setPdfUrl('');
+      setCoverFile(null);
+      setPdfFile(null);
+      setUploadProgress({ cover: 0, pdf: 0 });
     } catch (error) {
-      toast.error('Failed to publish book.');
+      console.error("Upload error:", error);
+      toast.error('Failed to publish book. Please check your connection and try again.');
     } finally {
       setIsUploading(false);
     }
@@ -153,27 +185,6 @@ export function DashboardPage() {
                   </div>
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label className="text-slate-300">Cover Image URL (Optional)</Label>
-                    <Input 
-                      placeholder="https://..." 
-                      value={coverImage}
-                      onChange={e => setCoverImage(e.target.value)}
-                      className="bg-slate-950 border-slate-800 focus:ring-blue-600/50"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-slate-300">PDF Document URL (Optional)</Label>
-                    <Input 
-                      placeholder="https://..." 
-                      value={pdfUrl}
-                      onChange={e => setPdfUrl(e.target.value)}
-                      className="bg-slate-950 border-slate-800 focus:ring-blue-600/50"
-                    />
-                  </div>
-                </div>
-
                 <div className="space-y-2">
                   <Label className="text-slate-300">Description</Label>
                   <Textarea 
@@ -186,23 +197,57 @@ export function DashboardPage() {
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-6">
-                  <div className="border-2 border-dashed border-slate-800 rounded-2xl p-8 text-center flex flex-col items-center justify-center gap-3 hover:border-blue-600 hover:bg-blue-600/5 transition-all cursor-pointer group">
-                    <div className="h-12 w-12 rounded-full bg-slate-800 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <ImagePlus className="h-6 w-6 text-slate-400" />
+                  <input 
+                    type="file" 
+                    ref={coverInputRef} 
+                    className="hidden" 
+                    accept="image/*"
+                    onChange={(e) => setCoverFile(e.target.files?.[0] || null)}
+                  />
+                  <div 
+                    onClick={() => coverInputRef.current?.click()}
+                    className={`border-2 border-dashed rounded-2xl p-8 text-center flex flex-col items-center justify-center gap-3 transition-all cursor-pointer group ${coverFile ? 'border-green-600 bg-green-600/5' : 'border-slate-800 hover:border-blue-600 hover:bg-blue-600/5'}`}
+                  >
+                    <div className={`h-12 w-12 rounded-full flex items-center justify-center transition-transform ${coverFile ? 'bg-green-600' : 'bg-slate-800 group-hover:scale-110'}`}>
+                      <ImagePlus className={`h-6 w-6 ${coverFile ? 'text-white' : 'text-slate-400'}`} />
                     </div>
                     <div>
-                      <p className="font-semibold text-slate-200">Upload Cover Image</p>
+                      <p className="font-semibold text-slate-200">
+                        {coverFile ? coverFile.name : 'Upload Cover Image'}
+                      </p>
                       <p className="text-xs text-slate-500">PNG, JPG (Max 5MB)</p>
+                      {isUploading && uploadProgress.cover > 0 && (
+                        <div className="w-full bg-slate-800 h-1 rounded-full mt-2 overflow-hidden">
+                          <div className="bg-blue-500 h-full transition-all duration-300" style={{ width: `${uploadProgress.cover}%` }} />
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  <div className="border-2 border-dashed border-slate-800 rounded-2xl p-8 text-center flex flex-col items-center justify-center gap-3 hover:border-blue-600 hover:bg-blue-600/5 transition-all cursor-pointer group">
-                    <div className="h-12 w-12 rounded-full bg-slate-800 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <FileUp className="h-6 w-6 text-slate-400" />
+                  <input 
+                    type="file" 
+                    ref={pdfInputRef} 
+                    className="hidden" 
+                    accept="application/pdf"
+                    onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
+                  />
+                  <div 
+                    onClick={() => pdfInputRef.current?.click()}
+                    className={`border-2 border-dashed rounded-2xl p-8 text-center flex flex-col items-center justify-center gap-3 transition-all cursor-pointer group ${pdfFile ? 'border-green-600 bg-green-600/5' : 'border-slate-800 hover:border-blue-600 hover:bg-blue-600/5'}`}
+                  >
+                    <div className={`h-12 w-12 rounded-full flex items-center justify-center transition-transform ${pdfFile ? 'bg-green-600' : 'bg-slate-800 group-hover:scale-110'}`}>
+                      <FileUp className={`h-6 w-6 ${pdfFile ? 'text-white' : 'text-slate-400'}`} />
                     </div>
                     <div>
-                      <p className="font-semibold text-slate-200">Upload PDF Document</p>
+                      <p className="font-semibold text-slate-200">
+                        {pdfFile ? pdfFile.name : 'Upload PDF Document'}
+                      </p>
                       <p className="text-xs text-slate-500">Max 20MB</p>
+                      {isUploading && uploadProgress.pdf > 0 && (
+                        <div className="w-full bg-slate-800 h-1 rounded-full mt-2 overflow-hidden">
+                          <div className="bg-blue-500 h-full transition-all duration-300" style={{ width: `${uploadProgress.pdf}%` }} />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
