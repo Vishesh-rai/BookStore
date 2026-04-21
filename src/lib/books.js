@@ -32,9 +32,9 @@ export const publishBook = async (bookData) => {
   try {
     const fullBook = {
       ...bookData,
-      likes: 0,
-      dislikes: 0,
-      downloadCount: 0,
+      likesCount: 0,
+      dislikesCount: 0,
+      downloads: 0,
       createdAt: serverTimestamp(),
     };
     await addDoc(collection(db, 'books'), fullBook);
@@ -58,13 +58,13 @@ export const updateBookLikes = async (bookId, userId, isLike) => {
     
     // Toggle action
     await updateDoc(bookRef, {
-      [isLike ? 'likes' : 'dislikes']: increment(1),
-      [isLike ? 'dislikes' : 'likes']: increment(-1)
+      [isLike ? 'likesCount' : 'dislikesCount']: increment(1),
+      [isLike ? 'dislikesCount' : 'likesCount']: increment(-1)
     });
   } else {
     // New action
     await updateDoc(bookRef, {
-      [isLike ? 'likes' : 'dislikes']: increment(1)
+      [isLike ? 'likesCount' : 'dislikesCount']: increment(1)
     });
   }
   
@@ -74,7 +74,7 @@ export const updateBookLikes = async (bookId, userId, isLike) => {
 export const registerDownload = async (bookId) => {
   const bookRef = doc(db, 'books', bookId);
   await updateDoc(bookRef, {
-    downloadCount: increment(1)
+    downloads: increment(1)
   });
 };
 

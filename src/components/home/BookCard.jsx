@@ -97,10 +97,11 @@ export function BookCard({ book, onQuickView }) {
         <Card className="group bg-slate-900/40 border border-slate-800 rounded-2xl overflow-hidden hover:border-slate-600 transition-all hover:shadow-2xl hover:shadow-black">
           <div className="relative aspect-[3/4] bg-slate-800 overflow-hidden">
             <img
-              src={book.coverImage}
+              src={book.imageUrl}
               alt={book.title}
               className="object-cover w-full h-full opacity-80 group-hover:opacity-100 transition-opacity duration-500"
               referrerPolicy="no-referrer"
+              onError={(e) => { e.target.src = 'https://picsum.photos/seed/book/400/600'; }}
             />
             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
               <Button size="sm" variant="secondary" onClick={() => onQuickView(book)} className="bg-slate-50 text-slate-900 border-none">
@@ -128,7 +129,7 @@ export function BookCard({ book, onQuickView }) {
                   className={`flex items-center gap-1 transition-all hover:scale-110 ${liked ? 'text-blue-500' : 'text-slate-500 hover:text-blue-500'}`}
                 >
                   <ThumbsUp className={`w-4 h-4 ${liked ? 'fill-current' : ''}`} />
-                  <span className="text-xs">{book.likes + (liked ? 1 : 0)}</span>
+                  <span className="text-xs">{book.likesCount || 0}</span>
                 </button>
                 <button 
                   onClick={() => handleAction('dislike', toggleDislike)}

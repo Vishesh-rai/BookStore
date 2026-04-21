@@ -23,10 +23,11 @@ export function QuickView({ book, onClose, onDownload }) {
         <SheetHeader className="space-y-6">
           <div className="aspect-[4/5] w-full rounded-2xl overflow-hidden shadow-2xl border border-slate-800">
             <img
-              src={book.coverImage}
+              src={book.imageUrl}
               alt={book.title}
               className="w-full h-full object-cover"
               referrerPolicy="no-referrer"
+              onError={(e) => { e.target.src = 'https://picsum.photos/seed/book/400/600'; }}
             />
           </div>
           <div className="space-y-4">
@@ -57,15 +58,15 @@ export function QuickView({ book, onClose, onDownload }) {
 
           <div className="grid grid-cols-3 gap-4 border-y border-slate-800 py-8">
             <div className="text-center">
-              <p className="text-3xl font-bold text-white mb-1">{book.likes}</p>
+              <p className="text-3xl font-bold text-white mb-1">{book.likesCount || 0}</p>
               <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Likes</p>
             </div>
             <div className="text-center border-x border-slate-800">
-              <p className="text-3xl font-bold text-white mb-1">{book.downloadCount}</p>
+              <p className="text-3xl font-bold text-white mb-1">{book.downloads || 0}</p>
               <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">PDF Hits</p>
             </div>
             <div className="text-center">
-              <p className="text-3xl font-bold text-white mb-1">{book.createdAt ? new Date(book.createdAt).getFullYear() : 'N/A'}</p>
+              <p className="text-3xl font-bold text-white mb-1">{book.createdAt?.seconds ? new Date(book.createdAt.seconds * 1000).getFullYear() : 'N/A'}</p>
               <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Release</p>
             </div>
           </div>

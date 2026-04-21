@@ -32,15 +32,15 @@ service cloud.firestore {
     }
 
     function isValidBook(data) {
-      return data.keys().hasAll(['title', 'authorId', 'authorName', 'category', 'coverImage', 'pdfUrl', 'createdAt', 'likes', 'dislikes', 'downloadCount']) &&
+      return data.keys().hasAll(['title', 'authorId', 'authorName', 'category', 'imageUrl', 'pdfUrl', 'createdAt', 'likesCount', 'dislikesCount', 'downloads']) &&
              data.keys().size() <= 12 &&
              data.title is string && data.title.size() <= 200 &&
              data.authorId == request.auth.uid &&
              data.authorName is string && data.authorName.size() <= 100 &&
              data.category in ['Education', 'Comic', 'Novel', 'Poetry'] &&
-             data.coverImage is string && data.coverImage.size() <= 2000 &&
+             data.imageUrl is string && data.imageUrl.size() <= 2000 &&
              data.pdfUrl is string && data.pdfUrl.size() <= 2000 &&
-             data.likes is number && data.dislikes is number && data.downloadCount is number &&
+             data.likesCount is number && data.dislikesCount is number && data.downloads is number &&
              data.createdAt is timestamp;
     }
 
@@ -56,7 +56,7 @@ service cloud.firestore {
 
     match /books/{bookId} {
       allow get, list: if true;
-      allow create: if isSignedIn() && isValidId(bookId) && isValidBook(incoming()) && 
+      allow create: if isSignedIn() && isValidBook(incoming()) && 
                     isAuthor() && incoming().createdAt == request.time;
       
       allow update: if isSignedIn() && (
@@ -65,12 +65,14 @@ service cloud.firestore {
          isValidBook(incoming()) &&
          incoming().createdAt == existing().createdAt &&
          incoming().authorId == existing().authorId &&
-         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'category', 'coverImage', 'pdfUrl'])) ||
+         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'category', 'imageUrl', 'pdfUrl'])) ||
         
-        // Public Atomic Interaction Actions (Using action-based pattern simulation)
-        (incoming().diff(existing()).affectedKeys().hasOnly(['likes']) && incoming().likes == existing().likes + 1) ||
-        (incoming().diff(existing()).affectedKeys().hasOnly(['dislikes']) && incoming().dislikes == existing().dislikes + 1) ||
-        (incoming().diff(existing()).affectedKeys().hasOnly(['downloadCount']) && incoming().downloadCount == existing().downloadCount + 1)
+        // Public Atomic Interaction Actions
+        (incoming().diff(existing()).affectedKeys().hasOnly(['likesCount', 'dislikesCount', 'downloads']) && (
+          incoming().likesCount != existing().likesCount ||
+          incoming().dislikesCount != existing().dislikesCount ||
+          incoming().downloads != existing().downloads
+        ))
       );
       
       allow delete: if isSignedIn() && request.auth.uid == existing().authorId;

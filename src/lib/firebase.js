@@ -5,38 +5,25 @@
 
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
-
-// Your web app's Firebase configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyDYnt-W3imeGgOq3dFayyrHOZx3azXlFiI",
-  authDomain: "studio-2620729134-4606b.firebaseapp.com",
-  projectId: "studio-2620729134-4606b",
-  storageBucket: "studio-2620729134-4606b.firebasestorage.app",
-  messagingSenderId: "497662035787",
-  appId: "1:497662035787:web:11b5064aca80fd6d020ace"
-};
+import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const storage = getStorage(app);
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
-// Validate connection on boot as per instructions
+// Validate connection on boot with a simpler check
 async function testConnection() {
   try {
-    await getDocFromServer(doc(db, '_internal', 'connection-test'));
-    console.log('Firebase connection established.');
+    // Attempting a simple read to check connectivity
+    // Using getDoc (not FromServer) to allow for internal retry logic
+    await getDoc(doc(db, 'system', 'ping'));
+    console.log('Firebase connection initialized.');
   } catch (error) {
-    if (error && error.message) {
-      if (error.message.includes('the client is offline')) {
-        console.error("Firebase Offline: Please check your internet connection or Firebase configuration.");
-      } else if (error.code === 'permission-denied') {
-        console.error("Firebase Permissions: Your Security Rules are blocking access.");
-      } else {
-        console.error("Firebase Connection Error:", error.message);
-      }
+    if (error && error.message && error.message.includes('offline')) {
+      console.warn("Firebase is starting in offline mode. It will sync once connection is stable.");
+    } else {
+      console.error("Firebase Initialization Notice:", error.code || error.message);
     }
   }
 }

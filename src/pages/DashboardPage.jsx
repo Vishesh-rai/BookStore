@@ -23,30 +23,25 @@ import {
   CardHeader, 
   CardTitle 
 } from '@/components/ui/card';
-import { Book as BookIcon, FileUp, ImagePlus, Heart, Download } from 'lucide-react';
+import { Book as BookIcon, Heart, Download, Link as LinkIcon, CheckCircle2, AlertCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { publishBook, subscribeToAuthorBooks } from '@/lib/books';
-import { uploadFile } from '@/lib/storage';
-import { useRef } from 'react';
 
 export function DashboardPage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('upload');
   const [authorBooks, setAuthorBooks] = useState([]);
   
-  const coverInputRef = useRef(null);
-  const pdfInputRef = useRef(null);
-
   // Form State
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('Education');
-  const [coverFile, setCoverFile] = useState(null);
-  const [pdfFile, setPdfFile] = useState(null);
+  const [imageUrl, setImageUrl] = useState('');
+  const [pdfUrl, setPdfUrl] = useState('');
   
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState({ cover: 0, pdf: 0 });
+  const [fakeProgress, setFakeProgress] = useState(0);
 
   useEffect(() => {
     if (!user) return;
@@ -56,11 +51,10 @@ export function DashboardPage() {
 
   const stats = useMemo(() => {
     const totals = authorBooks.reduce((acc, book) => {
-      acc.downloads += book.downloadCount || 0;
-      acc.likes += book.likes || 0;
-      acc.dislikes += book.dislikes || 0;
+      acc.downloads += book.downloads || 0;
+      acc.likes += book.likesCount || 0;
       return acc;
-    }, { downloads: 0, likes: 0, dislikes: 0 });
+    }, { downloads: 0, likes: 0 });
 
     return [
       { label: 'Total Downloads', value: totals.downloads.toLocaleString(), icon: <Download className="w-5 h-5 text-blue-500" /> },
@@ -68,36 +62,75 @@ export function DashboardPage() {
       { label: 'Publications', value: authorBooks.length.toLocaleString(), icon: <BookIcon className="w-5 h-5 text-purple-500" /> },
     ];
   }, [authorBooks]);
- 
-  const handleUpload = async (e) => {
+
+  const isValidImageUrl = (url) => {
+    return url && url.match(/^https?:\/\/.*\.(jpeg|jpg|png|webp|gif)$/i) || url.startsWith('http');
+  };
+
+  const isGoogleDriveLink = (url) => {
+    return url.includes('drive.google.com');
+  };
+
+  const convertGDriveLink = (url) => {
+    if (!isGoogleDriveLink(url)) return url;
+    try {
+      const parts = url.split('/');
+      let fileId = '';
+      if (url.includes('id=')) {
+        fileId = url.split('id=')[1].split('&')[0];
+      } else {
+        const dIndex = parts.indexOf('d');
+        if (dIndex !== -1 && parts[dIndex + 1]) {
+          fileId = parts[dIndex + 1];
+        }
+      }
+      return fileId ? `https://drive.google.com/uc?export=download&id=${fileId}` : url;
+    } catch (e) {
+      return url;
+    }
+  };
+
+  const simulateProgress = () => {
+    setFakeProgress(0);
+    return new Promise((resolve) => {
+      let current = 0;
+      const interval = setInterval(() => {
+        current += Math.random() * 30;
+        if (current >= 100) {
+          setFakeProgress(100);
+          clearInterval(interval);
+          resolve();
+        } else {
+          setFakeProgress(current);
+        }
+      }, 200);
+    });
+  };
+
+  const handlePublish = async (e) => {
     e.preventDefault();
     if (!user) {
-      toast.error('You must be logged in to publish a book.');
+      toast.error('You must be logged in to publish.');
       return;
     }
 
-    if (!coverFile || !pdfFile) {
-      toast.error('Please select both a cover image and a PDF document.');
+    if (!title || !description || !imageUrl || !pdfUrl) {
+      toast.error('Please fill in all required fields.');
       return;
     }
-    
+
+    if (!isValidImageUrl(imageUrl)) {
+      toast.error('Please enter a valid image URL.');
+      return;
+    }
+
     setIsUploading(true);
-    setUploadProgress({ cover: 0, pdf: 0 });
-
+    
     try {
-      // 1. Upload Cover
-      const coverPath = `books/${user.id}/${Date.now()}_cover_${coverFile.name}`;
-      const coverUrl = await uploadFile(coverFile, coverPath, (p) => 
-        setUploadProgress(prev => ({ ...prev, cover: p }))
-      );
+      await simulateProgress();
+      
+      const finalPdfUrl = convertGDriveLink(pdfUrl);
 
-      // 2. Upload PDF
-      const pdfPath = `books/${user.id}/${Date.now()}_doc_${pdfFile.name}`;
-      const pdfUrlFinal = await uploadFile(pdfFile, pdfPath, (p) => 
-        setUploadProgress(prev => ({ ...prev, pdf: p }))
-      );
-
-      // 3. Save Metadata
       await publishBook({
         title,
         description,
@@ -105,19 +138,19 @@ export function DashboardPage() {
         authorId: user.id,
         authorName: user.name,
         authorNiche: user.niche || 'Education',
-        coverImage: coverUrl,
-        pdfUrl: pdfUrlFinal,
+        imageUrl,
+        pdfUrl: finalPdfUrl,
       });
       
       toast.success('Book published successfully!');
       setTitle('');
       setDescription('');
-      setCoverFile(null);
-      setPdfFile(null);
-      setUploadProgress({ cover: 0, pdf: 0 });
+      setImageUrl('');
+      setPdfUrl('');
+      setFakeProgress(0);
     } catch (error) {
-      console.error("Upload error:", error);
-      toast.error('Failed to publish book. Please check your connection and try again.');
+      console.error("Publish error:", error);
+      toast.error('Failed to publish book. Please try again.');
     } finally {
       setIsUploading(false);
     }
@@ -157,7 +190,7 @@ export function DashboardPage() {
               <CardDescription className="text-slate-400">Fill in the details below to publish your PDF.</CardDescription>
             </CardHeader>
             <CardContent className="p-8">
-              <form onSubmit={handleUpload} className="space-y-6">
+              <form onSubmit={handlePublish} className="space-y-6">
                 <div className="grid md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label className="text-slate-300">Book Title</Label>
@@ -197,87 +230,92 @@ export function DashboardPage() {
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-6">
-                  <input 
-                    type="file" 
-                    ref={coverInputRef} 
-                    className="hidden" 
-                    accept="image/*"
-                    onChange={(e) => setCoverFile(e.target.files?.[0] || null)}
-                  />
-                  <div 
-                    onClick={() => coverInputRef.current?.click()}
-                    className={`border-2 border-dashed rounded-2xl p-8 text-center flex flex-col items-center justify-center gap-3 transition-all cursor-pointer group ${coverFile ? 'border-green-600 bg-green-600/5' : 'border-slate-800 hover:border-blue-600 hover:bg-blue-600/5'}`}
-                  >
-                    <div className={`h-12 w-12 rounded-full flex items-center justify-center transition-transform ${coverFile ? 'bg-green-600' : 'bg-slate-800 group-hover:scale-110'}`}>
-                      <ImagePlus className={`h-6 w-6 ${coverFile ? 'text-white' : 'text-slate-400'}`} />
+                  <div className="space-y-2">
+                    <Label className="text-slate-300">Cover Image URL</Label>
+                    <div className="relative">
+                      <Input 
+                        placeholder="https://example.com/cover.jpg" 
+                        value={imageUrl}
+                        onChange={e => setImageUrl(e.target.value)}
+                        className="bg-slate-950 border-slate-800 focus:ring-blue-600/50 text-white placeholder:text-slate-600 pr-10"
+                        required 
+                      />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        {isValidImageUrl(imageUrl) ? (
+                          <CheckCircle2 className="w-4 h-4 text-green-500" />
+                        ) : imageUrl ? (
+                          <AlertCircle className="w-4 h-4 text-red-500" />
+                        ) : null}
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-semibold text-slate-200">
-                        {coverFile ? coverFile.name : 'Upload Cover Image'}
-                      </p>
-                      <p className="text-xs text-slate-500">PNG, JPG (Max 5MB)</p>
-                      {isUploading && (
-                        <div className="w-full mt-2 space-y-1">
-                          <div className="flex justify-between text-[10px] text-slate-400">
-                            <span>Uploading Cover...</span>
-                            <span>{Math.round(uploadProgress.cover)}%</span>
-                          </div>
-                          <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                            <div 
-                              className="bg-blue-500 h-full transition-all duration-300" 
-                              style={{ width: `${uploadProgress.cover}%` }} 
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    <p className="text-[10px] text-slate-500">Supports direct PNG, JPG, or WebP links.</p>
                   </div>
-
-                  <input 
-                    type="file" 
-                    ref={pdfInputRef} 
-                    className="hidden" 
-                    accept="application/pdf"
-                    onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
-                  />
-                  <div 
-                    onClick={() => pdfInputRef.current?.click()}
-                    className={`border-2 border-dashed rounded-2xl p-8 text-center flex flex-col items-center justify-center gap-3 transition-all cursor-pointer group ${pdfFile ? 'border-green-600 bg-green-600/5' : 'border-slate-800 hover:border-blue-600 hover:bg-blue-600/5'}`}
-                  >
-                    <div className={`h-12 w-12 rounded-full flex items-center justify-center transition-transform ${pdfFile ? 'bg-green-600' : 'bg-slate-800 group-hover:scale-110'}`}>
-                      <FileUp className={`h-6 w-6 ${pdfFile ? 'text-white' : 'text-slate-400'}`} />
+                  <div className="space-y-2">
+                    <Label className="text-slate-300">PDF Document Link</Label>
+                    <div className="relative">
+                      <Input 
+                        placeholder="Google Drive link or PDF URL" 
+                        value={pdfUrl}
+                        onChange={e => setPdfUrl(e.target.value)}
+                        className="bg-slate-950 border-slate-800 focus:ring-blue-600/50 text-white placeholder:text-slate-600 pr-10"
+                        required 
+                      />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        {pdfUrl ? (
+                          <CheckCircle2 className="w-4 h-4 text-green-500" />
+                        ) : null}
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-semibold text-slate-200">
-                        {pdfFile ? pdfFile.name : 'Upload PDF Document'}
-                      </p>
-                      <p className="text-xs text-slate-500">Max 20MB</p>
-                      {isUploading && (
-                        <div className="w-full mt-2 space-y-1">
-                          <div className="flex justify-between text-[10px] text-slate-400">
-                            <span>Uploading PDF...</span>
-                            <span>{Math.round(uploadProgress.pdf)}%</span>
-                          </div>
-                          <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                            <div 
-                              className="bg-blue-500 h-full transition-all duration-300" 
-                              style={{ width: `${uploadProgress.pdf}%` }} 
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    <p className="text-[10px] text-slate-500">Google Drive links will be converted for direct download.</p>
                   </div>
                 </div>
 
+                {isUploading && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs text-slate-400">
+                      <span>Publishing to Library...</span>
+                      <span>{Math.round(fakeProgress)}%</span>
+                    </div>
+                    <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-700">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${fakeProgress}%` }}
+                        className="bg-blue-600 h-full shadow-[0_0_10px_rgba(37,99,235,0.5)]"
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <Button type="submit" size="lg" className="w-full h-14 text-lg rounded-2xl bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-900/20" disabled={isUploading}>
-                  {isUploading ? 'Publishing...' : 'Publish to Library'}
+                  {isUploading ? 'Processing...' : 'Publish to Library'}
                 </Button>
               </form>
             </CardContent>
           </Card>
 
           <div className="space-y-8">
+            <Card className="rounded-3xl border border-slate-800 bg-slate-900/50 shadow-xl overflow-hidden">
+              <CardHeader className="bg-slate-900/80 border-b border-slate-800">
+                <CardTitle className="text-white text-lg">Preview</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0 flex items-center justify-center bg-slate-950 aspect-[3/4] group relative">
+                {imageUrl && isValidImageUrl(imageUrl) ? (
+                  <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  <div className="flex flex-col items-center gap-2 text-slate-600">
+                    <ImagePlus className="w-12 h-12" />
+                    <span className="text-xs">Image Preview</span>
+                  </div>
+                )}
+                {title && (
+                  <div className="absolute bottom-4 left-4 right-4 bg-black/60 backdrop-blur-md p-3 rounded-xl border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <p className="text-white text-sm font-bold truncate">{title}</p>
+                    <p className="text-slate-400 text-[10px]">{category}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             <Card className="rounded-3xl border border-slate-800 bg-slate-900/50 shadow-xl">
               <CardHeader>
                 <CardTitle className="text-white">Your Publications</CardTitle>
@@ -287,17 +325,24 @@ export function DashboardPage() {
                 {authorBooks.length > 0 ? (
                   authorBooks.map(book => (
                     <div key={book.id} className="flex items-center gap-4 p-4 rounded-2xl bg-slate-950 border border-slate-800">
-                      <div className="h-12 w-12 rounded-lg overflow-hidden shrink-0">
-                        <img src={book.coverImage} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <div className="h-12 w-12 rounded-lg overflow-hidden shrink-0 border border-slate-800">
+                        <img 
+                          src={book.imageUrl} 
+                          className="w-full h-full object-cover" 
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            e.target.src = 'https://picsum.photos/seed/book/200/300';
+                          }}
+                        />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-slate-200 truncate">{book.title}</p>
                         <div className="flex items-center gap-4 mt-1">
                           <span className="flex items-center gap-1 text-[10px] text-slate-500">
-                            <Download className="w-3 h-3" /> {book.downloadCount || 0}
+                            <Download className="w-3 h-3" /> {book.downloads || 0}
                           </span>
                           <span className="flex items-center gap-1 text-[10px] text-slate-500">
-                            <Heart className="w-3 h-3" /> {book.likes || 0}
+                            <Heart className="w-3 h-3" /> {book.likesCount || 0}
                           </span>
                         </div>
                       </div>
@@ -310,15 +355,6 @@ export function DashboardPage() {
                 )}
               </CardContent>
             </Card>
-
-            <div className="p-8 rounded-3xl bg-blue-600 text-white space-y-4 relative overflow-hidden shadow-2xl shadow-blue-900/40">
-               <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
-               <h3 className="text-xl font-bold relative z-10">Pro Tip</h3>
-               <p className="text-blue-100 relative z-10 font-light leading-relaxed">
-                 Use high-quality vertical covers (2:3 aspect ratio) to increase click-through rates by up to 40%.
-               </p>
-               <Button variant="link" className="text-white p-0 h-auto relative z-10 font-bold decoration-white/30 underline-offset-4">Read documentation</Button>
-            </div>
           </div>
         </div>
       ) : (
