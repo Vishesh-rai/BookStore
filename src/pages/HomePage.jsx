@@ -26,9 +26,11 @@ export function HomePage() {
 
   const filteredBooks = useMemo(() => {
     return books.filter((book) => {
+      const title = book.title || '';
+      const authorName = book.authorName || '';
       const matchesSearch = 
-        book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        book.authorName.toLowerCase().includes(searchQuery.toLowerCase());
+        title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        authorName.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCategory = selectedCategory === 'All' || book.category === selectedCategory;
       return matchesSearch && matchesCategory;
     });

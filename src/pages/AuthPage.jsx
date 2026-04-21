@@ -170,7 +170,7 @@ export function AuthPage() {
                       placeholder="Your name" 
                       value={name} 
                       onChange={e => setName(e.target.value)} 
-                      className="h-14 bg-slate-900 border-slate-800 focus:ring-blue-600/50 rounded-xl" 
+                      className="h-14 bg-slate-900 border-slate-800 focus:ring-blue-600/50 rounded-xl text-white placeholder:text-slate-600" 
                       required 
                     />
                   </div>

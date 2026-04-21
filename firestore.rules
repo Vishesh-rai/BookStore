@@ -74,6 +74,11 @@ service cloud.firestore {
       );
       
       allow delete: if isSignedIn() && request.auth.uid == existing().authorId;
+
+      match /interactions/{userId} {
+        allow read: if true;
+        allow write: if isSignedIn() && request.auth.uid == userId;
+      }
     }
 
     match /users/{userId}/library/{savedBookId} {

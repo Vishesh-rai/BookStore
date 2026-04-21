@@ -165,7 +165,7 @@ export function DashboardPage() {
                       placeholder="e.g. Master React in 30 Days" 
                       value={title}
                       onChange={e => setTitle(e.target.value)}
-                      className="bg-slate-950 border-slate-800 focus:ring-blue-600/50"
+                      className="bg-slate-950 border-slate-800 focus:ring-blue-600/50 text-white placeholder:text-slate-600"
                       required 
                     />
                   </div>
@@ -189,7 +189,7 @@ export function DashboardPage() {
                   <Label className="text-slate-300">Description</Label>
                   <Textarea 
                     placeholder="Tell your readers what your book is about..." 
-                    className="min-h-[150px] resize-none bg-slate-950 border-slate-800 focus:ring-blue-600/50"
+                    className="min-h-[150px] resize-none bg-slate-950 border-slate-800 focus:ring-blue-600/50 text-white placeholder:text-slate-600"
                     value={description}
                     onChange={e => setDescription(e.target.value)}
                     required
@@ -216,9 +216,18 @@ export function DashboardPage() {
                         {coverFile ? coverFile.name : 'Upload Cover Image'}
                       </p>
                       <p className="text-xs text-slate-500">PNG, JPG (Max 5MB)</p>
-                      {isUploading && uploadProgress.cover > 0 && (
-                        <div className="w-full bg-slate-800 h-1 rounded-full mt-2 overflow-hidden">
-                          <div className="bg-blue-500 h-full transition-all duration-300" style={{ width: `${uploadProgress.cover}%` }} />
+                      {isUploading && (
+                        <div className="w-full mt-2 space-y-1">
+                          <div className="flex justify-between text-[10px] text-slate-400">
+                            <span>Uploading Cover...</span>
+                            <span>{Math.round(uploadProgress.cover)}%</span>
+                          </div>
+                          <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                            <div 
+                              className="bg-blue-500 h-full transition-all duration-300" 
+                              style={{ width: `${uploadProgress.cover}%` }} 
+                            />
+                          </div>
                         </div>
                       )}
                     </div>
@@ -243,9 +252,18 @@ export function DashboardPage() {
                         {pdfFile ? pdfFile.name : 'Upload PDF Document'}
                       </p>
                       <p className="text-xs text-slate-500">Max 20MB</p>
-                      {isUploading && uploadProgress.pdf > 0 && (
-                        <div className="w-full bg-slate-800 h-1 rounded-full mt-2 overflow-hidden">
-                          <div className="bg-blue-500 h-full transition-all duration-300" style={{ width: `${uploadProgress.pdf}%` }} />
+                      {isUploading && (
+                        <div className="w-full mt-2 space-y-1">
+                          <div className="flex justify-between text-[10px] text-slate-400">
+                            <span>Uploading PDF...</span>
+                            <span>{Math.round(uploadProgress.pdf)}%</span>
+                          </div>
+                          <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                            <div 
+                              className="bg-blue-500 h-full transition-all duration-300" 
+                              style={{ width: `${uploadProgress.pdf}%` }} 
+                            />
+                          </div>
                         </div>
                       )}
                     </div>

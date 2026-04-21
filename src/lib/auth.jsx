@@ -30,18 +30,24 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fUser) => {
-      setFirebaseUser(fUser);
-      if (fUser) {
-        const userDoc = await getDoc(doc(db, 'users', fUser.uid));
-        if (userDoc.exists()) {
-          setUser({ id: fUser.uid, ...userDoc.data() });
+      try {
+        setFirebaseUser(fUser);
+        if (fUser) {
+          const userDoc = await getDoc(doc(db, 'users', fUser.uid));
+          if (userDoc.exists()) {
+            setUser({ id: fUser.uid, ...userDoc.data() });
+          } else {
+            setUser(null);
+          }
         } else {
           setUser(null);
         }
-      } else {
+      } catch (error) {
+        console.error("Auth initialization error:", error);
         setUser(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();

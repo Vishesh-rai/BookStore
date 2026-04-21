@@ -19,12 +19,33 @@ import {
 } from "@/components/ui/dialog";
 import { Link } from 'react-router-dom';
 import { updateBookLikes, registerDownload } from '@/lib/books';
+import { getDoc, doc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export function BookCard({ book, onQuickView }) {
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const [liked, setLiked] = useState(false);
   const [disliked, setDisliked] = useState(false);
   const [showGuestModal, setShowGuestModal] = useState(false);
+
+  // Check if user has already liked/disliked this book
+  useEffect(() => {
+    if (user && book) {
+      const checkInteraction = async () => {
+        try {
+          const interactionDoc = await getDoc(doc(db, 'books', book.id, 'interactions', user.id));
+          if (interactionDoc.exists()) {
+            const data = interactionDoc.data();
+            if (data.type === 'like') setLiked(true);
+            if (data.type === 'dislike') setDisliked(true);
+          }
+        } catch (e) {
+          console.error("Error checking interaction:", e);
+        }
+      };
+      checkInteraction();
+    }
+  }, [user, book]);
 
   const handleAction = async (actionName, action) => {
     if (role === 'guest') {
@@ -37,7 +58,7 @@ export function BookCard({ book, onQuickView }) {
   const toggleLike = async () => {
     if (liked) return;
     try {
-      await updateBookLikes(book.id, true);
+      await updateBookLikes(book.id, user.id, true);
       setLiked(true);
       setDisliked(false);
       toast.success(`Liked ${book.title}`);
@@ -49,7 +70,7 @@ export function BookCard({ book, onQuickView }) {
   const toggleDislike = async () => {
     if (disliked) return;
     try {
-      await updateBookLikes(book.id, false);
+      await updateBookLikes(book.id, user.id, false);
       setDisliked(true);
       setLiked(false);
     } catch (error) {

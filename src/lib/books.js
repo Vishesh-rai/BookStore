@@ -15,7 +15,8 @@ import {
   increment,
   setDoc,
   where,
-  getDocs
+  getDocs,
+  getDoc
 } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -43,11 +44,31 @@ export const publishBook = async (bookData) => {
   }
 };
 
-export const updateBookLikes = async (bookId, isLike) => {
+export const updateBookLikes = async (bookId, userId, isLike) => {
   const bookRef = doc(db, 'books', bookId);
-  await updateDoc(bookRef, {
-    [isLike ? 'likes' : 'dislikes']: increment(1)
-  });
+  const likeRef = doc(db, 'books', bookId, 'interactions', userId);
+  
+  const likeDoc = await getDoc(likeRef);
+  
+  if (likeDoc.exists()) {
+    const data = likeDoc.data();
+    if (data.type === (isLike ? 'like' : 'dislike')) {
+      return; // Already did this action
+    }
+    
+    // Toggle action
+    await updateDoc(bookRef, {
+      [isLike ? 'likes' : 'dislikes']: increment(1),
+      [isLike ? 'dislikes' : 'likes']: increment(-1)
+    });
+  } else {
+    // New action
+    await updateDoc(bookRef, {
+      [isLike ? 'likes' : 'dislikes']: increment(1)
+    });
+  }
+  
+  await setDoc(likeRef, { type: isLike ? 'like' : 'dislike', updatedAt: serverTimestamp() });
 };
 
 export const registerDownload = async (bookId) => {
