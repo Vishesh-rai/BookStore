@@ -4,7 +4,7 @@
  */
 
 import { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './lib/auth';
 import { Navbar } from './components/layout/Navbar';
 import { HomePage } from './pages/HomePage';
@@ -12,13 +12,32 @@ import { AuthPage } from './pages/AuthPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LibraryPage } from './pages/LibraryPage';
 import { Toaster } from './components/ui/sonner';
+import { LoadingScreen } from './components/layout/LoadingScreen';
 import { ExternalLink, X } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+
+function PageTransition({ children }) {
+  const location = useLocation();
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={location.pathname}
+        initial={{ opacity: 0, scale: 0.98 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 1.02 }}
+        transition={{ duration: 0.3, ease: "easeInOut" }}
+      >
+        {children}
+      </motion.div>
+    </AnimatePresence>
+  );
+}
 
 function JoinPrompt() {
-  const { user } = useAuth();
+  const { firebaseUser } = useAuth();
   const [show, setShow] = useState(true);
 
-  if (user || !show) return null;
+  if (firebaseUser || !show) return null;
 
   return (
     <div className="fixed bottom-6 right-6 w-80 bg-blue-600 text-white rounded-2xl p-4 shadow-2xl shadow-blue-900/50 flex items-center gap-4 border border-blue-400/20 z-50 animate-bounce">
@@ -38,38 +57,52 @@ function JoinPrompt() {
 }
 
 function AppRoutes() {
-  const { role, user, loading } = useAuth();
+  const { role, user, loading, firebaseUser, needsRegistration } = useAuth();
 
+  // 1. If still initializing auth, show full-screen modern loader
   if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
+
+  // 2. Routing Logic:
+  // - If logged in but not registered -> show AuthPage (registration form)
+  // - If authorized pages (dashboard, library) are accessed, redirect if needed
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 transition-colors duration-300 selection:bg-blue-500/30">
       <Navbar />
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/auth" element={<AuthPage />} />
-        <Route 
-          path="/library" 
-          element={user ? <LibraryPage /> : <Navigate to="/auth" />} 
-        />
-        <Route 
-          path="/dashboard" 
-          element={role === 'author' ? <DashboardPage /> : <Navigate to="/" />} 
-        />
-        <Route 
-          path="/upload" 
-          element={role === 'author' ? <DashboardPage /> : <Navigate to="/" />} 
-        />
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
-      <JoinPrompt />
-      <Toaster position="bottom-right" theme="dark" />
+      <main className="pt-16">
+        <PageTransition>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            
+            <Route 
+              path="/auth" 
+              element={user ? <Navigate to="/" /> : <AuthPage />} 
+            />
+            
+            <Route 
+              path="/library" 
+              element={user ? <LibraryPage /> : <Navigate to="/auth" />} 
+            />
+            
+            <Route 
+              path="/dashboard" 
+              element={role === 'author' ? <DashboardPage /> : <Navigate to="/" />} 
+            />
+            
+            <Route 
+              path="/upload" 
+              element={role === 'author' ? <DashboardPage /> : <Navigate to="/" />} 
+            />
+
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
+        </PageTransition>
+      </main>
+      
+      {!user && <JoinPrompt />}
+      <Toaster position="bottom-right" theme="dark" closeButton richColors />
     </div>
   );
 }

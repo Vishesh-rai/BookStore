@@ -25,6 +25,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [needsRegistration, setNeedsRegistration] = useState(false);
 
   const role = user?.role || 'guest';
 
@@ -36,11 +37,14 @@ export function AuthProvider({ children }) {
           const userDoc = await getDoc(doc(db, 'users', fUser.uid));
           if (userDoc.exists()) {
             setUser({ id: fUser.uid, ...userDoc.data() });
+            setNeedsRegistration(false);
           } else {
             setUser(null);
+            setNeedsRegistration(true);
           }
         } else {
           setUser(null);
+          setNeedsRegistration(false);
         }
       } catch (error) {
         console.error("Auth initialization error:", error);
@@ -60,7 +64,12 @@ export function AuthProvider({ children }) {
       const userDoc = await getDoc(doc(db, 'users', result.user.uid));
       
       if (!userDoc.exists()) {
+        setNeedsRegistration(true);
         toast.info("Welcome! Please complete your registration.");
+      } else {
+        setNeedsRegistration(false);
+        setUser({ id: result.user.uid, ...userDoc.data() });
+        toast.success("Welcome back!");
       }
     } catch (error) {
       console.error("Full Login Error:", error);
@@ -78,6 +87,7 @@ export function AuthProvider({ children }) {
     if (!firebaseUser) throw new Error("No authenticated user found");
 
     try {
+      // Simulate setup delay for better UX as requested
       const userData = {
         name,
         email: firebaseUser.email,
@@ -88,8 +98,14 @@ export function AuthProvider({ children }) {
       };
 
       await setDoc(doc(db, 'users', firebaseUser.uid), userData);
-      setUser({ id: firebaseUser.uid, ...userData });
-      toast.success("Account created successfully!");
+      
+      // Delay state update to allow animation to show
+      setTimeout(() => {
+        setUser({ id: firebaseUser.uid, ...userData });
+        setNeedsRegistration(false);
+        toast.success("Account created successfully!");
+      }, 1500);
+
     } catch (error) {
       console.error("Registration failed:", error);
       toast.error("Registration failed. Please try again.");
@@ -101,6 +117,7 @@ export function AuthProvider({ children }) {
       await signOut(auth);
       setUser(null);
       setFirebaseUser(null);
+      setNeedsRegistration(false);
       toast.success("Logged out successfully");
     } catch (error) {
       console.error("Logout failed:", error);
@@ -108,7 +125,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, firebaseUser, role, loading, login, logout, register }}>
+    <AuthContext.Provider value={{ user, firebaseUser, role, loading, needsRegistration, login, logout, register }}>
       {children}
     </AuthContext.Provider>
   );
