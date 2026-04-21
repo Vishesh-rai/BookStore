@@ -1,0 +1,83 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny for all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helper Functions ---
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+
+    function isAuthor() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'author';
+    }
+
+    // --- Entity Validations ---
+    function isValidUser(data) {
+      return data.keys().hasAll(['name', 'email', 'role', 'createdAt']) &&
+             data.keys().size() <= 6 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.email is string && data.email.size() <= 100 &&
+             data.role in ['reader', 'author'] &&
+             (data.get('niche', null) == null || data.niche in ['Education', 'Comic', 'Novel', 'Poetry']) &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidBook(data) {
+      return data.keys().hasAll(['title', 'authorId', 'authorName', 'category', 'coverImage', 'pdfUrl', 'createdAt', 'likes', 'dislikes', 'downloadCount']) &&
+             data.keys().size() <= 12 &&
+             data.title is string && data.title.size() <= 200 &&
+             data.authorId == request.auth.uid &&
+             data.authorName is string && data.authorName.size() <= 100 &&
+             data.category in ['Education', 'Comic', 'Novel', 'Poetry'] &&
+             data.coverImage is string && data.coverImage.size() <= 2000 &&
+             data.pdfUrl is string && data.pdfUrl.size() <= 2000 &&
+             data.likes is number && data.dislikes is number && data.downloadCount is number &&
+             data.createdAt is timestamp;
+    }
+
+    // --- Main Rules ---
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(incoming()) && incoming().createdAt == request.time;
+      allow update: if isOwner(userId) && isValidUser(incoming()) && 
+                    incoming().role == existing().role && // Role immutable after creation
+                    incoming().createdAt == existing().createdAt &&
+                    incoming().diff(existing()).affectedKeys().hasOnly(['name', 'niche']);
+    }
+
+    match /books/{bookId} {
+      allow get, list: if true;
+      allow create: if isSignedIn() && isValidId(bookId) && isValidBook(incoming()) && 
+                    isAuthor() && incoming().createdAt == request.time;
+      
+      allow update: if isSignedIn() && (
+        // Author full update (protected fields immutable)
+        (request.auth.uid == existing().authorId && 
+         isValidBook(incoming()) &&
+         incoming().createdAt == existing().createdAt &&
+         incoming().authorId == existing().authorId &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'category', 'coverImage', 'pdfUrl'])) ||
+        
+        // Public Atomic Interaction Actions (Using action-based pattern simulation)
+        (incoming().diff(existing()).affectedKeys().hasOnly(['likes']) && incoming().likes == existing().likes + 1) ||
+        (incoming().diff(existing()).affectedKeys().hasOnly(['dislikes']) && incoming().dislikes == existing().dislikes + 1) ||
+        (incoming().diff(existing()).affectedKeys().hasOnly(['downloadCount']) && incoming().downloadCount == existing().downloadCount + 1)
+      );
+      
+      allow delete: if isSignedIn() && request.auth.uid == existing().authorId;
+    }
+
+    match /users/{userId}/library/{savedBookId} {
+      allow read, write: if isOwner(userId) && isValidId(savedBookId);
+    }
+  }
+}

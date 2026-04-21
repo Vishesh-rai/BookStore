@@ -1,0 +1,51 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User account information and roles.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["reader", "author"] },
+        "niche": { "type": "string", "enum": ["Education", "Comic", "Novel", "Poetry"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "email", "role"]
+    },
+    "Book": {
+      "title": "Book Metadata",
+      "description": "Information about a published book.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorNiche": { "type": "string", "enum": ["Education", "Comic", "Novel", "Poetry"] },
+        "description": { "type": "string" },
+        "category": { "type": "string", "enum": ["Education", "Comic", "Novel", "Poetry"] },
+        "coverImage": { "type": "string" },
+        "pdfUrl": { "type": "string" },
+        "likes": { "type": "number" },
+        "dislikes": { "type": "number" },
+        "downloadCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "authorId", "authorName", "category", "coverImage", "pdfUrl", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles indexed by UID."
+    },
+    "/books/{bookId}": {
+      "schema": "Book",
+      "description": "Published books metadata."
+    },
+    "/users/{userId}/library/{bookId}": {
+      "schema": { "$ref": "#/entities/Book" },
+      "description": "Books saved to a reader's library."
+    }
+  }
+}
